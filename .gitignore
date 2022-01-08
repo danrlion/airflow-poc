@@ -1,3 +1,9 @@
+## CUSTOM
+airflow/airflow.cfg
+airflow/airflow.db
+airflow/logs*
+airflow/webserver_config.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -102,7 +108,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+#.env
 .venv
 env/
 venv/

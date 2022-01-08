@@ -1,0 +1,2 @@
+airflow webserver --port 8080 > /dev/null 2>&1 &
+airflow scheduler > /dev/null 2>&1 &
