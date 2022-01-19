@@ -13,14 +13,15 @@ import os
 # Update the default arguments and apply them to the DAG.
 # You can override them on a per-task basis during operator initialization.
 default_args = {
-    'start_date': datetime(2021,12,7),
+    'start_date': datetime.now() - timedelta(days=7), # datetime(2021,12,7),
     'owner': 'airflow',
     'depends_on_past': False,
     'email': [os.environ['AIRFLOW_TO_EMAIL']],
-    'email_on_failure': True,
+    'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
+    'schedule_interval': '@daily',
     # 'queue': 'bash_queue',
     # 'pool': 'backfill',
     # 'priority_weight': 10,
@@ -39,12 +40,15 @@ default_args = {
     'aemet_api_key': os.environ['AEMET_API_KEY'],
     'target_datalake': os.environ["AIRFLOW_TARGET_DATALAKE"],
     'aemet_codigos': [11010, 26002, 24014, 45157, 18003, 18153, 45054, 45199, 23003, 28022, 45099, 45031, 45180, 45038],
+    'dbname': os.environ['AIRFLOW_AEMET_PREDICTIONS_DBNAME'],
+    'dbuser': os.environ['AIRFLOW_AEMET_PREDICTIONS_USERNAME'],
+    'dbpass': os.environ['AIRFLOW_AEMET_PREDICTIONS_PASSWORD']
 }
 
 with DAG(dag_id='etl_aemet_1', default_args=default_args) as dag:
 
     sensor = FileSensor(task_id='sense_file', 
-                        filepath=default_args['target_datalake'] + '/raw/aemet/startprocess.txt',
+                        filepath=default_args['target_datalake'] + '/startprocess.txt',
                         poke_interval=45,
                         dag=dag)
 
@@ -52,9 +56,7 @@ with DAG(dag_id='etl_aemet_1', default_args=default_args) as dag:
                             bash_command='rm -f /home/repl/*.tmp',
                             dag=dag)'''
 
-    # python_hello = PythonOperator(task_id='python_hello', python_callable=my_func)
-
-    python_task_get = PythonOperator(task_id='get_aemet_hourly_predictions', 
+    python_task_extract = PythonOperator(task_id='extract_aemet_hourly_predictions', 
                                 python_callable=getPredictionsAemetHourly,
                                 provide_context=True,
                                 op_kwargs=default_args,
@@ -65,6 +67,14 @@ with DAG(dag_id='etl_aemet_1', default_args=default_args) as dag:
                                 provide_context=True,
                                 op_kwargs=default_args,
                                 dag=dag)
+
+    python_task_insert = PythonOperator(task_id='insert_aemet_hourly_predictions', 
+                                python_callable=insertPredictionsAemetHourly,
+                                provide_context=True,
+                                op_kwargs=default_args,
+                                dag=dag)
+
+
 
     '''print_context = PythonOperator(
         task_id="print_context",
@@ -115,4 +125,6 @@ with DAG(dag_id='etl_aemet_1', default_args=default_args) as dag:
     #sensor >> bash_task >> python_task
     #python_task >> branch_task >> [email_report_task, no_email_task]
 
-    sensor >> python_task_get >> python_task_transform
+    sensor >> python_task_extract >> python_task_transform
+    python_task_transform >> python_task_insert
+
